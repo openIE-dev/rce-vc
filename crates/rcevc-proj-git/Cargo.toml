@@ -1,0 +1,13 @@
+[package]
+name = "rcevc-proj-git"
+description = "RCE-VC projection Π_git: admitted states as ordinary Git history; plain git commits ingested as changes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rcevc-core = { path = "../rcevc-core" }
+
+[[example]]
+name = "git_roundtrip"

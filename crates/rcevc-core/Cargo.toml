@@ -1,0 +1,13 @@
+[package]
+name = "rcevc-core"
+description = "RCE-VC: the Law of Version Control. Total transition, name-free keys, gate, commutation, integration ladder, hash-chained log."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# No dependencies by design: the core is std-only, no clock, no randomness, no I/O.
+[dependencies]
+
+[[example]]
+name = "swarm"
