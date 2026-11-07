@@ -29,6 +29,26 @@ This workspace covers milestones **M0**, **M1** and **M2** of the RCE-VC paper (
 Not here yet: storage beyond Git loose objects, leases, Wasmtime sandboxing
 of checkers, measured energy. See the roadmap below.
 
+## Assurance boundary
+
+`rcevc-core::assure` keeps admission on `Repo::submit`. It does not add a
+second receipt. A content digest proves the bytes, not that an action
+produced them. A checked action is minted only from an outcome already in
+that repository's log, and it applies only at the head and gate it was
+checked against. Individual accepts do not discharge a combined sequence.
+`CasRef` and `GitDir::compare_and_swap_ref` retry one op id; another writer's
+identical target is not success. Stated `est_uj` is not electricity. The
+in-repository conflict signature is unchanged and is not this cache.
+
+The gap inventory, threat model, and the measurements from one machine are
+in `docs/ingestion-2026-11-07.md`.
+
+```
+cargo test --offline
+cargo clippy --offline --all-targets -- -D warnings
+cargo run --release -p rcevc-proj-git --example isolate_bench -- /tmp/rcevc-isolate
+```
+
 ## Propositions → tests (`crates/rcevc-core/tests/propositions.rs`)
 
 | Claim | Test |
@@ -47,7 +67,7 @@ of checkers, measured energy. See the roadmap below.
 | SHA-256 correctness | FIPS 180-4 vectors in `hash.rs` |
 
 ```
-cargo test --offline                                   # 24 tests (core 18, git 6)
+cargo test --offline                                   # 35 tests (core 26, git 9)
 cargo run --release --example swarm                    # 64 writers x 20 rounds, 400 units
 cargo run --release --example swarm -- 64 5 10000      # same workload at 100,000 units
 ```

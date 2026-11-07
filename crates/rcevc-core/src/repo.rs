@@ -592,6 +592,12 @@ fn same_content(a: &State, b: &State, moved: &BTreeSet<Slot>) -> bool {
 }
 
 /// Name-free signature of a conflict: the keys on each side, not the slot.
+///
+/// The digest covers those keys only. It does not cover the gate. That is
+/// safe inside one [`Repo`], whose gate is fixed for the life of the value,
+/// and it is not an action-cache key. A shared cache must use [`crate::assure`],
+/// which separates blob integrity from action-to-result trust and binds the
+/// checker identity.
 pub fn conflict_signature(b: Option<&Digest>, h: Option<&Digest>, t: Option<&Digest>) -> Digest {
     let mut e = Enc::new("rcevc/conflict/v1");
     e.opt_digest(b).opt_digest(h).opt_digest(t);
