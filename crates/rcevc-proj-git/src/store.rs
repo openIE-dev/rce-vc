@@ -166,12 +166,20 @@ impl GitDir {
     }
 
     /// Point `name` (for example `refs/heads/main`) at `oid`.
+    ///
+    /// Takes the same lock file as [`GitDir::compare_and_swap_ref`]. A held
+    /// lock fails instead of writing over a compare-and-swap. This is a
+    /// local `create_new` file, not a distributed lock.
     pub fn set_ref(&self, name: &str, oid: &Oid) -> io::Result<()> {
         let p = self.git.join(name);
         if let Some(d) = p.parent() {
             fs::create_dir_all(d)?;
         }
-        fs::write(p, format!("{}\n", oid.hex()))
+        let _lock = acquire_lock(&lock_path(&p)).map_err(lock_io)?;
+        let tmp = sibling(&p, ".cas-tmp");
+        fs::write(&tmp, format!("{}\n", oid.hex()))?;
+        fs::rename(tmp, p)?;
+        Ok(())
     }
 
     /// Read a loose ref.
@@ -185,11 +193,15 @@ impl GitDir {
     /// object id. The ref target is a Git object id. A matching object id
     /// written by another attempt is not success for this `op_id`.
     ///
-    /// The lock file is `{name}.lock`. The op log is
-    /// `.git/rcevc-cas/ops/{name}/{op_id}` and is executor-local state, not a
-    /// Git object and not an admission receipt. A held lock returns
-    /// [`RefUpdateError::Busy`] instead of waiting. This function does not
-    /// claim crash durability beyond the rename of the loose ref.
+    /// The lock file is `{name}.lock`. The temporary file is `{name}.cas-tmp`
+    /// (the whole file name, so a dotted ref such as `refs/tags/v1.2.3` is
+    /// the file that moves). The op log is `.git/rcevc-cas/ops/{name}/{op_id}`
+    /// and is executor-local state, not a Git object and not an admission
+    /// receipt. A held lock returns [`RefUpdateError::Busy`] instead of
+    /// waiting. The same op id with a different object id is
+    /// [`RefUpdateError::OpRetarget`]. This is a local filesystem lock, not
+    /// a distributed one, and it does not claim crash durability beyond the
+    /// rename of the loose ref.
     pub fn compare_and_swap_ref(
         &self,
         name: &str,
@@ -204,6 +216,12 @@ impl GitDir {
         let lock_path = lock_path(&path);
         let _lock = acquire_lock(&lock_path)?;
         if let Some(wrote) = read_op(&self.op_path(name, &op_id))? {
+            if wrote != new_oid {
+                return Err(RefUpdateError::OpRetarget {
+                    wrote,
+                    requested: new_oid,
+                });
+            }
             let still_tip = self.read_ref(name) == Some(wrote);
             return Ok(RefCas::Replay { wrote, still_tip });
         }
@@ -214,7 +232,7 @@ impl GitDir {
             }
             return Err(RefUpdateError::Stale { expected, current });
         }
-        let tmp = path.with_extension("tmp");
+        let tmp = sibling(&path, ".cas-tmp");
         fs::write(&tmp, format!("{}\n", new_oid.hex()))?;
         fs::rename(&tmp, &path)?;
         let op = self.op_path(name, &op_id);
@@ -274,6 +292,13 @@ pub enum RefUpdateError {
         /// Current tip.
         current: Oid,
     },
+    /// This op id already wrote `wrote`, and the retry asked for `requested`.
+    OpRetarget {
+        /// Object id in the op log.
+        wrote: Oid,
+        /// Object id the retry asked to write.
+        requested: Oid,
+    },
 }
 
 impl From<io::Error> for RefUpdateError {
@@ -309,9 +334,17 @@ fn checked_ref_path(git: &Path, name: &str) -> Result<PathBuf, RefUpdateError> {
 }
 
 fn lock_path(ref_path: &Path) -> PathBuf {
-    let mut os = ref_path.as_os_str().to_os_string();
-    os.push(".lock");
+    sibling(ref_path, ".lock")
+}
+
+fn sibling(path: &Path, suffix: &str) -> PathBuf {
+    let mut os = path.as_os_str().to_os_string();
+    os.push(suffix);
     PathBuf::from(os)
+}
+
+fn lock_io(err: RefUpdateError) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, err.to_string())
 }
 
 struct LockGuard {

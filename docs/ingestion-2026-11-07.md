@@ -50,9 +50,14 @@ are unchanged. There is no second receipt schema, and nothing here is
 `GitDir::compare_and_swap_ref` is the same rule on a loose ref. The op id is
 an RCE-VC digest, not a Git object id. The op log under `.git/rcevc-cas/` is
 executor-local state, not a Git object and not an admission receipt. A held
-`{ref}.lock` returns `Busy` instead of waiting. Copying a loose object into
-another workspace does not copy the ref or the op log. `set_ref` is
-unchanged and is still what export uses.
+`{ref}.lock` returns `Busy` instead of waiting. The temporary file is the
+ref path plus `.cas-tmp`, so a dotted name such as `refs/tags/v1.2.3` is the
+file that moves. Replaying an op id with a different target returns
+`OpRetarget` and does not move the ref. `set_ref` takes that same lock and
+does not write while the lock is held. The lock is a local `create_new`
+file, not a distributed lock. Copying a loose object into another workspace
+does not copy the ref or the op log. A lookup whose gate matches no stored
+row is `GateMismatch`, including when the head differs as well.
 
 `conflict_signature` is unchanged. It covers the three unit keys and not the
 gate. That remains an index inside one `Repo`, whose gate cannot be swapped.
@@ -80,16 +85,16 @@ admission. A refusal hit is not an accept.
 
 ### Tests
 
-`cargo test --offline` on rustc 1.85.0: 35 tests, 0 failed.
+`cargo test --locked --offline --all-targets` on rustc 1.85.0: 41 tests, 0 failed.
 
 | Crate | Tests |
 |---|---|
 | `rcevc-core` lib | 4 |
-| `rcevc-core` `tests/assure.rs` | 8 |
+| `rcevc-core` `tests/assure.rs` | 11 |
 | `rcevc-core` `tests/propositions.rs` | 14 |
 | `rcevc-proj-git` lib | 3 |
 | `rcevc-proj-git` `tests/git_interop.rs` | 3 |
-| `rcevc-proj-git` `tests/ref_cas.rs` | 2 |
+| `rcevc-proj-git` `tests/ref_cas.rs` | 5 |
 | `rcevc-proj-git` `tests/isolate.rs` | 1 |
 
 `cargo clippy --offline --all-targets -- -D warnings` exited 0 on the same
@@ -108,9 +113,15 @@ Toolchain: rustc 1.85.0 (`4d91de4e4`, 2025-02-17). This machine's default
 recorded). No crates.io dependency was added. No network during the test
 run (`--offline`).
 
+The repository had no GitHub Actions workflows and no commit statuses.
+`.github/workflows/ci.yml` is the pull-request check: Rust 1.85.0,
+`cargo test --locked --offline --all-targets`, then
+`cargo clippy --locked --offline --all-targets -- -D warnings`. It does not
+filter tests. A response of zero check runs is not a pass.
+
 ```
-cargo +1.85.0 test --offline --all-targets
-cargo +1.85.0 clippy --offline --all-targets -- -D warnings
+cargo +1.85.0 test --locked --offline --all-targets
+cargo +1.85.0 clippy --locked --offline --all-targets -- -D warnings
 cargo +1.85.0 run --offline --release -p rcevc-proj-git --example isolate_bench -- /tmp/rcevc-isolate-release
 cargo +1.85.0 run --offline -p rcevc-proj-git --example isolate_bench -- /tmp/rcevc-isolate-debug
 ```
@@ -161,6 +172,11 @@ repository.
 
 No storage rewrite, no packfile reader, and no replacement of Git. Pando and
 Scion were read as evidence against that rewrite, below.
+
+A later read of GitHub, still on 2026-11-07, found `rce` pull request 152
+merged. `rce` `main` was then `7e4e968ce8a72667ad7f5e16d7f87d587ad2e19f`.
+Pull requests 151, 153, 154, and 155 were still open. Their diffs were not
+re-read, and this repository was not changed to follow that merge.
 
 ## Gap inventory
 

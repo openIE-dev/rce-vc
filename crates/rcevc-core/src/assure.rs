@@ -554,17 +554,31 @@ impl ActionCache {
             }
             return finish_row(row, store);
         }
-        if let Some(row) = rows.iter().find(|row| row.head == current_head) {
+        if let Some(row) = rows
+            .iter()
+            .find(|row| row.head == current_head && row.gate != current_gate)
+        {
             return Lookup::Reject(AssureError::GateMismatch {
                 recorded: row.gate,
                 current: current_gate,
             });
         }
-        let recorded = rows[0].head;
-        Lookup::Reject(AssureError::StaleHead {
-            recorded,
-            current: current_head,
-        })
+        if let Some(row) = rows
+            .iter()
+            .find(|row| row.gate == current_gate && row.head != current_head)
+        {
+            return Lookup::Reject(AssureError::StaleHead {
+                recorded: row.head,
+                current: current_head,
+            });
+        }
+        match rows.first() {
+            Some(row) => Lookup::Reject(AssureError::GateMismatch {
+                recorded: row.gate,
+                current: current_gate,
+            }),
+            None => Lookup::Miss,
+        }
     }
 
     /// Record `checked` as the decision for `members` in log order.
@@ -769,7 +783,8 @@ fn chain_logged(repo: &Repo, members: &[Change], outcome: &Outcome) -> bool {
         }
         if let Some(pre) = expect_pre {
             if outcome_pre(&entry.outcome) != pre {
-                return false;
+                // An earlier submission of this change. Keep scanning.
+                continue;
             }
         }
         let last = matched + 1 == members.len();
@@ -855,6 +870,11 @@ impl CasRef {
     /// A repeated `op_id` does not move the ref again. [`CasOk::Replay`]
     /// reports whether the tip is still the value that op wrote.
     /// `still_tip == false` is not authority to treat `wrote` as current.
+    /// The same `op_id` with a different `new_target` is
+    /// [`CasFail::OpRetarget`] and leaves the ref where it is.
+    ///
+    /// This value is not `Sync`. Callers serialize `&mut self`. It is not a
+    /// cross-process lock.
     pub fn compare_and_swap(
         &mut self,
         op_id: Digest,
@@ -863,6 +883,12 @@ impl CasRef {
         new_target: Digest,
     ) -> Result<CasOk, CasFail> {
         if let Some(wrote) = self.applied.get(&op_id).copied() {
+            if wrote.target != new_target {
+                return Err(CasFail::OpRetarget {
+                    wrote,
+                    requested: new_target,
+                });
+            }
             return Ok(CasOk::Replay {
                 wrote,
                 still_tip: self.tip == wrote,
@@ -915,6 +941,13 @@ pub enum CasFail {
     UnrelatedWriter {
         /// Tip actually present.
         current: RefTip,
+    },
+    /// This op id already wrote a different target. The ref was not moved.
+    OpRetarget {
+        /// Tip that op wrote.
+        wrote: RefTip,
+        /// Target the retry asked for.
+        requested: Digest,
     },
 }
 

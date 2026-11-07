@@ -49,6 +49,10 @@ cargo clippy --offline --all-targets -- -D warnings
 cargo run --release -p rcevc-proj-git --example isolate_bench -- /tmp/rcevc-isolate
 ```
 
+`.github/workflows/ci.yml` runs `cargo test --locked --offline --all-targets`
+and `cargo clippy --locked --offline --all-targets -- -D warnings` on pull
+requests, with Rust 1.85.0. An empty check list is not a passing result.
+
 ## Propositions → tests (`crates/rcevc-core/tests/propositions.rs`)
 
 | Claim | Test |
@@ -67,7 +71,7 @@ cargo run --release -p rcevc-proj-git --example isolate_bench -- /tmp/rcevc-isol
 | SHA-256 correctness | FIPS 180-4 vectors in `hash.rs` |
 
 ```
-cargo test --offline                                   # 35 tests (core 26, git 9)
+cargo test --offline                                   # 41 tests (core 29, git 12)
 cargo run --release --example swarm                    # 64 writers x 20 rounds, 400 units
 cargo run --release --example swarm -- 64 5 10000      # same workload at 100,000 units
 ```

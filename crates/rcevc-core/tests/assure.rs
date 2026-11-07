@@ -479,4 +479,74 @@ fn compare_and_swap_retries_do_not_apply_twice_or_adopt_another_writer() {
     assert!(
         matches!(refs.compare_and_swap(op3, 0, a, c), Err(CasFail::UnrelatedWriter { current }) if current.target == c)
     );
+    let other = sha256(b"not-b");
+    assert!(matches!(
+        refs.compare_and_swap(op1, 0, a, other),
+        Err(CasFail::OpRetarget { wrote, requested }) if wrote.target == b && requested == other
+    ));
+    assert_eq!(refs.tip().target, c);
+}
+
+#[test]
+fn corrupt_bytes_after_a_hit_are_not_a_hit() {
+    let mut repo = Repo::new(Gate::new(), genesis()).unwrap();
+    let base = repo.head_root();
+    let change = Change::new("w", base, Level::MeaningChange).put("p", Unit::new("v1", &[]));
+    let outcome = repo.submit(change.clone());
+    let mut store = ContentStore::new();
+    let checked = bind_ok(&repo, &change, &outcome, &mut store);
+    let mut cache = ActionCache::new();
+    cache.insert(&checked, &store).unwrap();
+    let query = ask(repo.gate().digest(), checked.head(), change.base, change.id(), &[]);
+    assert!(matches!(cache.lookup(query, &store), Lookup::Hit(_)));
+    store.plant_unverified(checked.output(), b"clobber".to_vec());
+    assert_eq!(
+        cache.lookup(query, &store),
+        Lookup::Reject(AssureError::CorruptOutput)
+    );
+}
+
+#[test]
+fn a_different_gate_and_head_is_not_a_stale_head_hit() {
+    let mut repo = Repo::new(Gate::new(), genesis()).unwrap();
+    let base = repo.head_root();
+    let change = Change::new("w", base, Level::MeaningChange).put("n", Unit::new("n", &[]));
+    let outcome = repo.submit(change.clone());
+    let mut store = ContentStore::new();
+    let checked = bind_ok(&repo, &change, &outcome, &mut store);
+    let mut cache = ActionCache::new();
+    cache.insert(&checked, &store).unwrap();
+    let other_gate = sha256(b"other-gate");
+    let other_head = sha256(b"other-head");
+    assert!(matches!(
+        cache.lookup(ask(other_gate, other_head, change.base, change.id(), &[]), &store),
+        Lookup::Reject(AssureError::GateMismatch { recorded, current }) if recorded == checked.gate() && current == other_gate
+    ));
+}
+
+#[test]
+fn an_earlier_submission_does_not_hide_a_later_linked_chain() {
+    let mut repo = Repo::new(Gate::new(), genesis()).unwrap();
+    let base = repo.head_root();
+    let edit_p = Change::new("p", base, Level::MeaningChange).put("p", Unit::new("p1", &[]));
+    let edit_q = Change::new("q", base, Level::MeaningChange).put("q", Unit::new("q1", &[]));
+    let early = repo.submit(edit_q.clone());
+    let mid = repo.submit(edit_p.clone());
+    let again = repo.submit(edit_q.clone());
+    assert!(early.is_accepted() && mid.is_accepted() && again.is_accepted());
+    let mut store = ContentStore::new();
+    let checked = bind_ok(&repo, &edit_q, &again, &mut store);
+    let mut cache = ActionCache::new();
+    cache
+        .insert_combined(&repo, &[edit_p.clone(), edit_q.clone()], &again, &checked, &store)
+        .unwrap();
+    match cache.lookup_combined(repo.gate().digest(), checked.head(), &[edit_p.id(), edit_q.id()], &store) {
+        Lookup::Hit(hit) => assert!(hit.require_accept().is_ok()),
+        other => panic!("later chain must be the combined row, got {other:?}"),
+    }
+    let early_checked = bind_ok(&repo, &edit_q, &early, &mut store);
+    assert_eq!(
+        cache.insert_combined(&repo, &[edit_p, edit_q], &early, &early_checked, &store),
+        Err(AssureError::ForgedBinding)
+    );
 }
