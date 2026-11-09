@@ -167,6 +167,7 @@ const DBASE: [u16; 30] = [
 const DEXT: [u8; 30] = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
 const ORDER: [usize; 19] = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
 
+#[allow(clippy::comparison_chain)] // symbol classes are literal, end, then length
 fn codes(s: &mut Bits<'_>, out: &mut Vec<u8>, lit: &Huff, dist: &Huff) -> Result<(), String> {
     loop {
         let sym = lit.decode(s)?;
@@ -290,6 +291,7 @@ pub fn zlib_inflate(data: &[u8]) -> Result<Vec<u8>, String> {
 mod tests {
     use super::*;
 
+    #[allow(clippy::format_collect)]
     fn hex(b: &[u8]) -> String {
         b.iter().map(|x| format!("{x:02x}")).collect()
     }

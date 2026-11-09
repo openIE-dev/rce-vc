@@ -11,3 +11,6 @@ rcevc-core = { path = "../rcevc-core" }
 
 [[example]]
 name = "git_roundtrip"
+
+[[example]]
+name = "isolate_bench"

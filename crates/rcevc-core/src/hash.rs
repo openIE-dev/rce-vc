@@ -6,7 +6,7 @@
 //! length-prefixed, domain-separated encoding, so no two distinct values
 //! share an encoding.
 
-use std::fmt;
+use std::fmt::{self, Write};
 
 /// A 32-byte digest.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -15,7 +15,11 @@ pub struct Digest(pub [u8; 32]);
 impl Digest {
     /// Full lowercase hex.
     pub fn hex(&self) -> String {
-        self.0.iter().map(|b| format!("{b:02x}")).collect()
+        let mut out = String::with_capacity(self.0.len() * 2);
+        for byte in &self.0 {
+            let _ = write!(out, "{byte:02x}");
+        }
+        out
     }
     /// Parse 64 hex characters.
     pub fn from_hex(s: &str) -> Option<Digest> {
@@ -161,6 +165,12 @@ impl Enc {
     /// Hash the encoding.
     pub fn finish(&self) -> Digest {
         sha256(&self.buf)
+    }
+    /// Borrow the encoded bytes. The digest of a value is [`sha256`] of this
+    /// slice; callers that store the bytes beside the digest use the same
+    /// slice.
+    pub fn as_slice(&self) -> &[u8] {
+        &self.buf
     }
 }
 

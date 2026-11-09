@@ -12,11 +12,13 @@
 #![warn(missing_docs)]
 
 pub mod codec;
+pub mod isolate;
 pub mod project;
 pub mod store;
 
+pub use isolate::measure_isolated;
 pub use project::{
     export, ingest, parse_unit, read_commit, read_tree, render_unit, trailer, write_commit, write_tree, Commit,
     Exported, HEADER,
 };
-pub use store::{GitDir, Oid, ProjError};
+pub use store::{GitDir, Oid, ProjError, RefCas, RefUpdateError};

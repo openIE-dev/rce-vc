@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test and clippy
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust 1.85.0
+        uses: dtolnay/rust-toolchain@1.85.0
+        with:
+          components: clippy
+
+      - name: Test
+        run: cargo test --locked --offline --all-targets
+
+      - name: Clippy
+        run: cargo clippy --locked --offline --all-targets -- -D warnings
