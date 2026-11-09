@@ -1,0 +1,14 @@
+[package]
+name = "rcevc-keys"
+description = "Tree-sitter content units for RCE-VC. Name-free ids for top-level Rust and Python items, with exact bytes kept for projection."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rcevc-core = { path = "../rcevc-core" }
+# 0.27 requires Rust 1.90, above this workspace's MSRV.
+tree-sitter = ">=0.26.13, <0.27"
+tree-sitter-python = "=0.25.0"
+tree-sitter-rust = "=0.24.2"
