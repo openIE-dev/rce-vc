@@ -53,6 +53,26 @@ cargo run --release -p rcevc-proj-git --example isolate_bench -- /tmp/rcevc-isol
 and `cargo clippy --locked --offline --all-targets -- -D warnings` on pull
 requests, with Rust 1.85.0. An empty check list is not a passing result.
 
+## Content units (`rcevc-keys`)
+
+`rcevc-keys` splits a Rust or Python file into top-level items. Each item's
+id is the core name-free key of a normalized token body, so a rename of the
+item does not change that key, and whitespace or comment extras do not either.
+Exact bytes, including whitespace and comments, stay in `parts`. `project`
+concatenates them back to the source. A dependency points only at an earlier
+item in the same file. A path that is not `.rs` or `.py`, or a tree with a
+parse error, is one leaf over the original bytes.
+
+HANDOFF section 9 B also names TypeScript. That grammar is not in this crate.
+Python is the other grammar from that list. Tree-sitter 0.27 needs Rust 1.90,
+so the lock is `tree-sitter` 0.26.13, `tree-sitter-rust` 0.24.2, and
+`tree-sitter-python` 0.25.0. Those crates, and their dependencies, are in
+`vendor/`. `.cargo/config.toml` points Cargo at that directory, which is why
+CI can stay `--locked --offline`. The grammar build compiles C and needs a
+system C compiler (`cc`). It does not download anything at build time.
+
+This layer does not state an energy or throughput result.
+
 ## Propositions → tests (`crates/rcevc-core/tests/propositions.rs`)
 
 | Claim | Test |
@@ -71,7 +91,7 @@ requests, with Rust 1.85.0. An empty check list is not a passing result.
 | SHA-256 correctness | FIPS 180-4 vectors in `hash.rs` |
 
 ```
-cargo test --offline                                   # 41 tests (core 29, git 12)
+cargo test --offline                                   # 49 tests (core 29, keys 8, git 12)
 cargo run --release --example swarm                    # 64 writers x 20 rounds, 400 units
 cargo run --release --example swarm -- 64 5 10000      # same workload at 100,000 units
 ```
@@ -171,7 +191,7 @@ SHA-256 on std; BLAKE3 is the design target for internal keys and replaces
 
 ## Roadmap (from the paper)
 
-- **M1** done: persistent state, incremental keys, scoped gate (above). Next in M1: `rcevc-keys` with tree-sitter so real source files split into function-level units (needs network for the crates).
+- **M1** in progress: persistent state, incremental keys, scoped gate, and `rcevc-keys` for Rust and Python top-level items. TypeScript units, and a byte-identical corpus round trip, are not done.
 - **M2** done in std-only form (below); next: move storage to gix with packfiles, and run the round trip on 1,000 public repositories.
 - **M3** `rcevc-gate` on Wasmtime: checkers as fuel-limited, deterministic Wasm modules with pinned digests.
 - **M4** leases and the real-time channel (CALM-monotone changes stream without coordination).
