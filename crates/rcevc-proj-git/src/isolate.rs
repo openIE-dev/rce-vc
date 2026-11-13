@@ -137,7 +137,7 @@ fn stated_est_uj() -> io::Result<u64> {
     let mut draft = Draft::new();
     draft.put("a", Unit::new("a", &[]));
     let mut repo = Repo::new(Gate::new(), draft)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| io::Error::other(e.to_string()))?;
     let base = repo.head_root();
     let outcome = repo.submit(
         Change::new("meter-absent", base, Level::MeaningChange).put("b", Unit::new("b", &[])),
@@ -218,5 +218,5 @@ fn stale_ref(git: &GitDir, current: Oid) -> io::Result<bool> {
 }
 
 fn io_ref(err: crate::store::RefUpdateError) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, err.to_string())
+    io::Error::other(err.to_string())
 }

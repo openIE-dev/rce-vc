@@ -312,20 +312,20 @@ impl Walk<'_> {
                     self.body.push_str("~self~\n");
                     return;
                 }
-                if !self.ambiguous.contains(text) {
-                    if let Some(slot) = self.earlier.get(text) {
-                        let index = match self.deps.iter().position(|dep| dep == slot) {
-                            Some(pos) => pos,
-                            None => {
-                                self.deps.push(slot.clone());
-                                self.deps.len() - 1
-                            }
-                        };
-                        self.body.push('$');
-                        self.body.push_str(&index.to_string());
-                        self.body.push('\n');
-                        return;
-                    }
+                if !self.ambiguous.contains(text)
+                    && let Some(slot) = self.earlier.get(text)
+                {
+                    let index = match self.deps.iter().position(|dep| dep == slot) {
+                        Some(pos) => pos,
+                        None => {
+                            self.deps.push(slot.clone());
+                            self.deps.len() - 1
+                        }
+                    };
+                    self.body.push('$');
+                    self.body.push_str(&index.to_string());
+                    self.body.push('\n');
+                    return;
                 }
             }
             self.body.push_str(node.kind());
@@ -335,7 +335,7 @@ impl Walk<'_> {
             return;
         }
         for i in 0..node.child_count() {
-            if let Some(child) = node.child(i as u32) {
+            if let Some(child) = node.child(i) {
                 self.go(child);
             }
         }

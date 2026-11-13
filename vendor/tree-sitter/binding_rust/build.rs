@@ -8,7 +8,7 @@ fn main() {
     generate_bindings(&out_dir);
 
     fs::copy(
-        "src/wasm/stdlib-symbols.txt",
+        "src/wasm-stdlib/imports.txt",
         out_dir.join("stdlib-symbols.txt"),
     )
     .unwrap();
@@ -28,7 +28,10 @@ fn main() {
     let src_path = manifest_path.join("src");
     let wasm_path = src_path.join("wasm");
 
-    if target.starts_with("wasm32-unknown") {
+    // wasm32-unknown-unknown has no libc, so compile in the subset from src/wasm-stdlib, with
+    // allocation coming from wasm_allocator.rs. wasm32-unknown-emscripten brings its own libc,
+    // so avoid colliding with its symbols.
+    if target == "wasm32-unknown-unknown" {
         configure_wasm_build(&mut config);
     }
 
@@ -60,18 +63,13 @@ fn main() {
 
 fn configure_wasm_build(config: &mut cc::Build) {
     let Ok(wasm_headers) = env::var("DEP_TREE_SITTER_LANGUAGE_WASM_HEADERS") else {
-        panic!("Environment variable DEP_TREE_SITTER_LANGUAGE_WASM_HEADERS must be set by the language crate");
+        panic!(
+            "Environment variable DEP_TREE_SITTER_LANGUAGE_WASM_HEADERS must be set by the language crate"
+        );
     };
-    let Ok(wasm_src) = env::var("DEP_TREE_SITTER_LANGUAGE_WASM_SRC").map(PathBuf::from) else {
-        panic!("Environment variable DEP_TREE_SITTER_LANGUAGE_WASM_SRC must be set by the language crate");
-    };
-
-    config.include(&wasm_headers);
-    config.files([
-        wasm_src.join("stdio.c"),
-        wasm_src.join("stdlib.c"),
-        wasm_src.join("string.c"),
-    ]);
+    config
+        .define("TREE_SITTER_WASM_STDLIB", "")
+        .include(&wasm_headers);
 }
 
 #[cfg(feature = "bindgen")]

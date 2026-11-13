@@ -51,7 +51,7 @@ cargo run --release -p rcevc-proj-git --example isolate_bench -- /tmp/rcevc-isol
 
 `.github/workflows/ci.yml` runs `cargo test --locked --offline --all-targets`
 and `cargo clippy --locked --offline --all-targets -- -D warnings` on pull
-requests, with Rust 1.85.0. An empty check list is not a passing result.
+requests, with Rust 1.100.0. An empty check list is not a passing result.
 
 ## Content units (`rcevc-keys`)
 
@@ -64,12 +64,13 @@ item in the same file. A path that is not `.rs` or `.py`, or a tree with a
 parse error, is one leaf over the original bytes.
 
 HANDOFF section 9 B also names TypeScript. That grammar is not in this crate.
-Python is the other grammar from that list. Tree-sitter 0.27 needs Rust 1.90,
-so the lock is `tree-sitter` 0.26.13, `tree-sitter-rust` 0.24.2, and
-`tree-sitter-python` 0.25.0. Those crates, and their dependencies, are in
-`vendor/`. `.cargo/config.toml` points Cargo at that directory, which is why
-CI can stay `--locked --offline`. The grammar build compiles C and needs a
-system C compiler (`cc`). It does not download anything at build time.
+Python is the other grammar from that list. The lock is `tree-sitter` 0.27.2,
+`tree-sitter-rust` 0.24.2, and `tree-sitter-python` 0.25.0; tree-sitter 0.27
+needs Rust 1.90, which sets this crate's MSRV. Those crates, and their
+dependencies, are in `vendor/`. `.cargo/config.toml` points Cargo at that
+directory, which is why CI can stay `--locked --offline`. The grammar build
+compiles C and needs a system C compiler (`cc`). It does not download anything
+at build time.
 
 This layer does not state an energy or throughput result.
 
@@ -184,8 +185,10 @@ submodules and non-UTF-8 files are refused with a reason rather than guessed.
 
 ## Toolchain
 
-Written for stable Rust, edition 2024, MSRV 1.85 without `if`/`while` let-chains
-(those need a newer compiler). Built and tested here with rustc 1.85.1. Hash is
+Written for stable Rust, edition 2024. `rcevc-core` and `rcevc-proj-git` keep
+MSRV 1.85, without `if`/`while` let-chains (those need a newer compiler);
+`rcevc-keys` needs 1.90 for tree-sitter 0.27. CI builds and tests with rustc
+1.100.0. Hash is
 SHA-256 on std; BLAKE3 is the design target for internal keys and replaces
 `hash.rs` only.
 

@@ -344,7 +344,7 @@ fn sibling(path: &Path, suffix: &str) -> PathBuf {
 }
 
 fn lock_io(err: RefUpdateError) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, err.to_string())
+    io::Error::other(err.to_string())
 }
 
 struct LockGuard {
